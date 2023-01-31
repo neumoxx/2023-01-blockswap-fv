@@ -124,6 +124,18 @@ contract SyndicateHarness is Syndicate {
         batchUpdateCollateralizedSlotOwnersAccruedETH(_blsPubKeys);
     }
 
+    function batchPreviewUnclaimedETHAsFreeFloatingStaker(address _staker, blsKey _blsPubKey) public returns(uint256) {
+        blsKey[] memory _blsPubKeys = new blsKey[](1);
+        _blsPubKeys[0] = _blsPubKey;
+        return this.batchPreviewUnclaimedETHAsFreeFloatingStaker(_staker, _blsPubKeys);
+    }
+
+    function batchPreviewUnclaimedETHAsCollateralizedSlotOwner(address _staker, blsKey _blsPubKey) public returns(uint256) {
+        blsKey[] memory _blsPubKeys = new blsKey[](1);
+        _blsPubKeys[0] = _blsPubKey;
+        return this.batchPreviewUnclaimedETHAsCollateralizedSlotOwner(_staker, _blsPubKeys);
+    }
+
     // overridden functions
     function getSlotRegistry() internal view override returns (ISlotSettlementRegistry slotSettlementRegistry) {
         return ISlotSettlementRegistry(registry);
@@ -131,6 +143,43 @@ contract SyndicateHarness is Syndicate {
 
     function getStakeHouseUniverse() internal view override returns (IStakeHouseUniverse stakeHouseUniverse) {
         return IStakeHouseUniverse(universe);
+    }
+
+    function getETHBalance(address account) external view returns(uint256) {
+        return account.balance;
+    }
+
+    function calculateCollateralizedETHOwedPerKnot() external view returns(uint256) {
+        return _calculateCollateralizedETHOwedPerKnot();
+    }
+
+    function calculateNewAccumulatedETHPerCollateralizedShare(uint256 ethSinceLastUpdate) external view returns(uint256) {
+        return _calculateNewAccumulatedETHPerCollateralizedShare(ethSinceLastUpdate);
+    }
+
+    function getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKey(blsKey blsPublicKey) external view returns(uint256) {
+        return _getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKey(blsPublicKey);
+    }
+
+    function isInitialized() external view returns(bool) {
+        bool initialized;
+        assembly {
+            initialized := sload(0)
+        }
+        return initialized;
+    }
+
+    function initialize(
+        address _contractOwner,
+        uint256 _priorityStakingEndBlock,
+        address _priorityStaker,
+        blsKey _blsPubKeysForSyndicateKnot
+    ) public {
+        blsKey[] memory _blsPubKeys = new blsKey[](1);
+        _blsPubKeys[0] = _blsPubKeysForSyndicateKnot;
+        address[] memory _priorityStakers = new address[](1);
+        _priorityStakers[0] = _priorityStaker;
+        return initialize(_contractOwner, _priorityStakingEndBlock, _priorityStakers, _blsPubKeys);
     }
 }
 

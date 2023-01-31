@@ -1,0 +1,13 @@
+diff --git a/certora/munged/syndicate/Syndicate.sol b/certora/munged/syndicate/Syndicate.sol
+index 07f69c8..0b863db 100644
+--- a/certora/munged/syndicate/Syndicate.sol
++++ b/certora/munged/syndicate/Syndicate.sol
+@@ -232,7 +232,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+             if (stakeHouse == address(0)) revert KnotIsNotAssociatedWithAStakeHouse();
+             IERC20 sETH = IERC20(getSlotRegistry().stakeHouseShareTokens(stakeHouse));
+             bool transferResult = sETH.transferFrom(msg.sender, address(this), _sETHAmount);
+-            if (!transferResult) revert UnableToStakeFreeFloatingSlot();
++            //if (!transferResult) revert UnableToStakeFreeFloatingSlot();
+ 
+             emit Staked(_blsPubKey, _sETHAmount);
+         }

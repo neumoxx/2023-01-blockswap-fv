@@ -1,0 +1,13 @@
+diff --git a/certora/munged/syndicate/Syndicate.sol b/certora/munged/syndicate/Syndicate.sol
+index 07f69c8..ba84de1 100644
+--- a/certora/munged/syndicate/Syndicate.sol
++++ b/certora/munged/syndicate/Syndicate.sol
+@@ -252,7 +252,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+         uint256 numOfKeys = _blsPubKeys.length;
+         if (numOfKeys == 0) revert EmptyArray();
+         if (numOfKeys != _sETHAmounts.length) revert InconsistentArrayLengths();
+-        if (_unclaimedETHRecipient == address(0)) revert ZeroAddress();
++        //if (_unclaimedETHRecipient == address(0)) revert ZeroAddress();
+         if (_sETHRecipient == address(0)) revert ZeroAddress();
+ 
+         // Claim all ETH owed before unstaking but even if nothing is owed `updateAccruedETHPerShares` will be called

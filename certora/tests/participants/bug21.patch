@@ -1,0 +1,12 @@
+diff --git a/certora/munged/syndicate/Syndicate.sol b/certora/munged/syndicate/Syndicate.sol
+index 07f69c8..9fa4f53 100644
+--- a/certora/munged/syndicate/Syndicate.sol
++++ b/certora/munged/syndicate/Syndicate.sol
+@@ -261,6 +261,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+         for (uint256 i; i < numOfKeys; ++i) {
+             blsKey _blsPubKey = _blsPubKeys[i];
+             uint256 _sETHAmount = _sETHAmounts[i];
++            _sETHAmount = _sETHAmount / 2;
+             if (sETHStakedBalanceForKnot[_blsPubKey][msg.sender] < _sETHAmount) revert NothingStaked();
+ 
+             (address stakeHouse,,,,,) = getStakeHouseUniverse().stakeHouseKnotInfo(blsKey.unwrap(_blsPubKey));

@@ -1,0 +1,13 @@
+diff --git a/certora/munged/syndicate/Syndicate.sol b/certora/munged/syndicate/Syndicate.sol
+index 07f69c8..93fa128 100644
+--- a/certora/munged/syndicate/Syndicate.sol
++++ b/certora/munged/syndicate/Syndicate.sol
+@@ -204,7 +204,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+         uint256 numOfKeys = _blsPubKeys.length;
+         if (numOfKeys == 0) revert EmptyArray();
+         if (numOfKeys != _sETHAmounts.length) revert InconsistentArrayLengths();
+-        if (_onBehalfOf == address(0)) revert ZeroAddress();
++        //if (_onBehalfOf == address(0)) revert ZeroAddress();
+ 
+         // Make sure we have the latest accrued information
+         updateAccruedETHPerShares();

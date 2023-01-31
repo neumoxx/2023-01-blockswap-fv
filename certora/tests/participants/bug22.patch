@@ -1,0 +1,13 @@
+diff --git a/certora/munged/syndicate/Syndicate.sol b/certora/munged/syndicate/Syndicate.sol
+index 07f69c8..07892ae 100644
+--- a/certora/munged/syndicate/Syndicate.sol
++++ b/certora/munged/syndicate/Syndicate.sol
+@@ -511,7 +511,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+         blsKey[] memory _blsPubKeysForSyndicateKnots
+     ) internal {
+         // Transfer ownership from the deployer to the address specified as the owner
+-        _transferOwnership(_contractOwner);
++        //_transferOwnership(_contractOwner);
+ 
+         // Add the initial set of knots to the syndicate
+         _registerKnotsToSyndicate(_blsPubKeysForSyndicateKnots);

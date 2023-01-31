@@ -1,0 +1,37 @@
+diff --git a/certora/munged/syndicate/Syndicate.sol b/certora/munged/syndicate/Syndicate.sol
+index 07f69c8..cc474e2 100644
+--- a/certora/munged/syndicate/Syndicate.sol
++++ b/certora/munged/syndicate/Syndicate.sol
+@@ -146,28 +146,28 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+     /// @param _newBLSPublicKeyBeingRegistered List of BLS public keys being added to the syndicate
+     function registerKnotsToSyndicate(
+         blsKey[] memory _newBLSPublicKeyBeingRegistered
+-    ) public onlyOwner { // MUNGED internal => public
++    ) public { // MUNGED internal => public
+         // update accrued ETH per SLOT type
+         updateAccruedETHPerShares();
+         _registerKnotsToSyndicate(_newBLSPublicKeyBeingRegistered);
+     }
+ 
+     /// @notice Make knot shares of a registered list of BLS public keys inactive - the action cannot be undone and no further ETH accrued
+-    function deRegisterKnots(blsKey[] memory _blsPublicKeys) public onlyOwner {// MUNGED internal => public
++    function deRegisterKnots(blsKey[] memory _blsPublicKeys) public {// MUNGED internal => public
+         updateAccruedETHPerShares();
+         _deRegisterKnots(_blsPublicKeys);
+     }
+ 
+     /// @notice Allows the contract owner to append to the list of priority sETH stakers
+     /// @param _priorityStakers List of staker addresses eligible for sETH staking
+-    function addPriorityStakers(address[] memory _priorityStakers) public onlyOwner { // MUNGED internal => public
++    function addPriorityStakers(address[] memory _priorityStakers) public { // MUNGED internal => public
+         updateAccruedETHPerShares();
+         _addPriorityStakers(_priorityStakers);
+     }
+ 
+     /// @notice Should this block be in the future, it means only those listed in the priority staker list can stake sETH
+     /// @param _endBlock Arbitrary block number after which anyone can stake up to 4 SLOT in sETH per KNOT
+-    function updatePriorityStakingBlock(uint256 _endBlock) public onlyOwner { // MUNGED internal => public
++    function updatePriorityStakingBlock(uint256 _endBlock) public { // MUNGED internal => public
+         updateAccruedETHPerShares();
+         priorityStakingEndBlock = _endBlock;
+     }

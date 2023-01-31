@@ -1,0 +1,22 @@
+diff --git a/certora/munged/syndicate/Syndicate.sol b/certora/munged/syndicate/Syndicate.sol
+index 07f69c8..c597042 100644
+--- a/certora/munged/syndicate/Syndicate.sol
++++ b/certora/munged/syndicate/Syndicate.sol
+@@ -122,7 +122,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+ 
+ 
+     /// @custom:oz-upgrades-unsafe-allow constructor
+-    constructor() initializer {}
++    constructor() {}
+ 
+     /// @param _contractOwner Ethereum public key that will receive management rights of the contract
+     /// @param _priorityStakingEndBlock Block number when priority sETH staking ends and anyone can stake
+@@ -133,7 +133,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+         uint256 _priorityStakingEndBlock,
+         address[] memory _priorityStakers,
+         blsKey[] memory _blsPubKeysForSyndicateKnots
+-    ) public virtual override initializer { // MUNGED internal => public
++    ) public virtual override { // MUNGED internal => public
+         _initialize(
+             _contractOwner,
+             _priorityStakingEndBlock,

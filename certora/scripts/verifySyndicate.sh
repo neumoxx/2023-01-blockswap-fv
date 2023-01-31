@@ -9,18 +9,28 @@ fi
 
 solc-select use 0.8.13
 
-certoraRun  certora/harnesses/SyndicateHarness.sol \
-    certora/harnesses/MockStakeHouseUniverse.sol \
-    certora/harnesses/MockStakeHouseRegistry.sol \
-    certora/harnesses/MockSlotSettlementRegistry.sol \
-    certora/harnesses/MocksETH.sol \
-    --verify SyndicateHarness:certora/specs/Syndicate.spec \
-    --cloud master \
-    --optimistic_loop \
-    --optimize 1 \
-    --loop_iter 3 \
-    $RULE \
-    --rule_sanity \
-    --settings -optimisticFallback=true \
-    --packages @blockswaplab=node_modules/@blockswaplab @openzeppelin=node_modules/@openzeppelin \
-    --msg "Syndicate $1 $2"
+for spec in certora/specs/*.spec;
+do      
+    specFile=$(basename $spec)
+
+    if [[ "${specFile%.*}" != "Syndicate" && "${specFile%.*}" != "SyndicateIssues" ]];
+    then
+        certoraRun  certora/harnesses/SyndicateHarness.sol \
+            certora/harnesses/MockStakeHouseUniverse.sol \
+            certora/harnesses/MockStakeHouseRegistry.sol \
+            certora/harnesses/MockSlotSettlementRegistry.sol \
+            certora/harnesses/MocksETH.sol \
+            --verify SyndicateHarness:certora/specs/$specFile \
+            --cloud master \
+            --optimistic_loop \
+            --optimize 1 \
+            --loop_iter 3 \
+            --send_only \
+            $RULE \
+            --rule_sanity \
+            --settings -optimisticFallback=true \
+            --packages @blockswaplab=node_modules/@blockswaplab @openzeppelin=node_modules/@openzeppelin \
+            --msg "Syndicate $specFile $1 $2"
+        
+    fi
+done

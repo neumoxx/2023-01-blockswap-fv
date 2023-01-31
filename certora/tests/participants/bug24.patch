@@ -1,0 +1,13 @@
+diff --git a/certora/munged/syndicate/Syndicate.sol b/certora/munged/syndicate/Syndicate.sol
+index 07f69c8..70aa07a 100644
+--- a/certora/munged/syndicate/Syndicate.sol
++++ b/certora/munged/syndicate/Syndicate.sol
+@@ -169,7 +169,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+     /// @param _endBlock Arbitrary block number after which anyone can stake up to 4 SLOT in sETH per KNOT
+     function updatePriorityStakingBlock(uint256 _endBlock) public onlyOwner { // MUNGED internal => public
+         updateAccruedETHPerShares();
+-        priorityStakingEndBlock = _endBlock;
++        priorityStakingEndBlock = _endBlock - 1;
+     }
+ 
+     /// @notice Update accrued ETH per SLOT share without distributing ETH as users of the syndicate individually pull funds
