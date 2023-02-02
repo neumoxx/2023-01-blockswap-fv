@@ -1,0 +1,26 @@
+diff --git a/certora/munged/syndicate/Syndicate.sol b/certora/munged/syndicate/Syndicate.sol
+index 07f69c8..841f331 100644
+--- a/certora/munged/syndicate/Syndicate.sol
++++ b/certora/munged/syndicate/Syndicate.sol
+@@ -548,6 +548,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+                     address collateralizedOwnerAtIndex = getSlotRegistry().getCollateralisedOwnerAtIndex(blsKey.unwrap(_blsPubKey), 0);
+                     accruedEarningPerCollateralizedSlotOwnerOfKnot[_blsPubKey][collateralizedOwnerAtIndex] += unprocessedETHForCurrentKnot;
+                 } else {
++                    uint256 balanceSum;
+                     for (uint256 i; i < numberOfCollateralisedSlotOwnersForKnot; ++i) {
+                         address collateralizedOwnerAtIndex = getSlotRegistry().getCollateralisedOwnerAtIndex(blsKey.unwrap(_blsPubKey), i);
+                         uint256 balance = getSlotRegistry().totalUserCollateralisedSLOTBalanceForKnot(
+@@ -556,9 +557,13 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+                             blsKey.unwrap(_blsPubKey)
+                         );
+ 
++                        balanceSum += balance;
++
+                         accruedEarningPerCollateralizedSlotOwnerOfKnot[_blsPubKey][collateralizedOwnerAtIndex] +=
+                             balance * unprocessedETHForCurrentKnot / (4 ether - currentSlashedAmount);
+                     }
++
++                    require(balanceSum == (4 ether - currentSlashedAmount), "Wrong balances from stakehouse");
+                 }
+ 
+                 // record so unprocessed goes to zero
