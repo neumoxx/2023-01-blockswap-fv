@@ -132,167 +132,98 @@ function sETHSolvencyCorrollary(address user1, address user2, bytes32 knot) retu
     return sETHStakedBalanceForKnot(knot,user1) + sETHStakedBalanceForKnot(knot,user2) <= sETHTotalStakeForKnot(knot);
 }
 
+
 /*-------------------------------------------------
-|         View functions return values             |
+|               High level rules                   |
 --------------------------------------------------*/
 
 /**
- * calculateUnclaimedFreeFloatingETHShare: returns as expected
+ * Total ETH received must not decrease.
  */
-rule calculateUnclaimedFreeFloatingETHShareReturnsAsExpected() {
-
-    env e;
-
-    address user;
-    bytes32 blsPubKey;
-
-    uint256 stakedBal = sETHStakedBalanceForKnot(blsPubKey, user);
-
-    uint256 accumulatedETHPerShare = lastAccumulatedETHPerFreeFloatingShare(blsPubKey) > 0 ?
-        lastAccumulatedETHPerFreeFloatingShare(blsPubKey) :
-        accumulatedETHPerFreeFloatingShare();
-
-    uint256 userShare = (accumulatedETHPerShare * stakedBal) / PRECISION();
+rule totalEthReceivedMonotonicallyIncreases(method f) filtered {
+    f -> notHarnessCall(f)
+}{
     
+    uint256 totalEthReceivedBefore = totalETHReceived();
 
-    assert stakedBal < 1000000000 => calculateUnclaimedFreeFloatingETHShare(blsPubKey, user) == 0, "Wrong value for calculateUnclaimedFreeFloatingETHShare";
-    assert stakedBal >= 1000000000 => calculateUnclaimedFreeFloatingETHShare(blsPubKey, user) == userShare - sETHUserClaimForKnot(blsPubKey, user), "Wrong value for calculateUnclaimedFreeFloatingETHShare";
+    env e; calldataarg args;
+    f(e, args);
 
+    uint256 totalEthReceivedAfter = totalETHReceived();
+
+    assert totalEthReceivedAfter >= totalEthReceivedBefore, "total ether received must not decrease";
 }
 
 /**
- * calculateETHForFreeFloatingOrCollateralizedHolders: returns as expected
+ * accumulatedETHPerFreeFloatingShare must not decrease.
  */
-rule calculateETHForFreeFloatingOrCollateralizedHoldersReturnsAsExpected() {
+rule accumulatedETHPerFreeFloatingShareMonotonicallyIncreases(method f) filtered {
+    f -> notHarnessCall(f)
+}{
+    
+    uint256 accumulatedETHPerFreeFloatingShareBefore = accumulatedETHPerFreeFloatingShare();
 
-    assert calculateETHForFreeFloatingOrCollateralizedHolders() == (totalETHReceived() / 2), "Wrong value for calculateETHForFreeFloatingOrCollateralizedHolders";
+    env e; calldataarg args;
+    f(e, args);
 
+    uint256 accumulatedETHPerFreeFloatingShareAfter = accumulatedETHPerFreeFloatingShare();
+
+    assert accumulatedETHPerFreeFloatingShareAfter >= accumulatedETHPerFreeFloatingShareBefore, "accumulatedETHPerFreeFloatingShare must not decrease";
 }
 
 /**
- * batchPreviewUnclaimedETHAsFreeFloatingStaker: returns as expected
+ * accumulatedETHPerCollateralizedSlotPerKnot must not decrease.
  */
-rule batchPreviewUnclaimedETHAsFreeFloatingStakerReturnsAsExpected() {
+rule accumulatedETHPerCollateralizedSlotPerKnotMonotonicallyIncreases(method f) filtered {
+    f -> notHarnessCall(f)
+}{
+    
+    uint256 accumulatedETHPerCollateralizedSlotPerKnotBefore = accumulatedETHPerCollateralizedSlotPerKnot();
 
-    address staker;
-    bytes32 blsPubKey;
+    env e; calldataarg args;
+    f(e, args);
 
-    assert batchPreviewUnclaimedETHAsFreeFloatingStaker(staker, blsPubKey) == previewUnclaimedETHAsFreeFloatingStaker(staker, blsPubKey), "Wrong value for batchPreviewUnclaimedETHAsFreeFloatingStaker";
+    uint256 accumulatedETHPerCollateralizedSlotPerKnotAfter = accumulatedETHPerCollateralizedSlotPerKnot();
 
+    assert accumulatedETHPerCollateralizedSlotPerKnotAfter >= accumulatedETHPerCollateralizedSlotPerKnotBefore, "accumulatedETHPerCollateralizedSlotPerKnot must not decrease";
 }
 
 /**
- * previewUnclaimedETHAsFreeFloatingStaker: returns as expected
+ * lastSeenETHPerCollateralizedSlotPerKnot must not decrease.
  */
-rule previewUnclaimedETHAsFreeFloatingStakerReturnsAsExpected() {
+rule lastSeenETHPerCollateralizedSlotPerKnotMonotonicallyIncreases(method f) filtered {
+    f -> notHarnessCall(f)
+}{
+    
+    uint256 lastSeenETHPerCollateralizedSlotPerKnotBefore = lastSeenETHPerCollateralizedSlotPerKnot();
 
-    address user;
-    bytes32 blsPubKey;
+    env e; calldataarg args;
+    f(e, args);
 
-    uint256 stakedBal = sETHStakedBalanceForKnot(blsPubKey, user);
+    uint256 lastSeenETHPerCollateralizedSlotPerKnotAfter = lastSeenETHPerCollateralizedSlotPerKnot();
 
-    uint256 accumulatedETHPerShare = accumulatedETHPerFreeFloatingShare() + calculateNewAccumulatedETHPerFreeFloatingShare();
-
-    uint256 userShare = (accumulatedETHPerShare * stakedBal) / PRECISION();
-
-    assert previewUnclaimedETHAsFreeFloatingStaker(user, blsPubKey) == userShare - sETHUserClaimForKnot(blsPubKey, user), "Wrong value for previewUnclaimedETHAsFreeFloatingStaker";
-
+    assert lastSeenETHPerCollateralizedSlotPerKnotAfter >= lastSeenETHPerCollateralizedSlotPerKnotBefore, "lastSeenETHPerCollateralizedSlotPerKnot must not decrease";
 }
 
 /**
- * batchPreviewUnclaimedETHAsCollateralizedSlotOwner: returns as expected
+ * calculateETHForFreeFloatingOrCollateralizedHolders must be always greater or equal than lastSeenETHPerCollateralizedSlotPerKnot.
  */
-rule batchPreviewUnclaimedETHAsCollateralizedSlotOwnerReturnsAsExpected() {
+rule calculatedETHGTElastSeenETHPerCollateralizedSlotPerKnot(method f) filtered {
+    f -> notHarnessCall(f)
+}{
+    
+    uint256 calculateETHForFreeFloatingOrCollateralizedHoldersBefore = calculateETHForFreeFloatingOrCollateralizedHolders();
+    uint256 lastSeenETHPerCollateralizedSlotPerKnotBefore = lastSeenETHPerCollateralizedSlotPerKnot();
 
-    address staker;
-    bytes32 blsPubKey;
+    require calculateETHForFreeFloatingOrCollateralizedHoldersBefore > lastSeenETHPerCollateralizedSlotPerKnotBefore;
 
-    assert batchPreviewUnclaimedETHAsCollateralizedSlotOwner(staker, blsPubKey) == previewUnclaimedETHAsCollateralizedSlotOwner(staker, blsPubKey), "Wrong value for batchPreviewUnclaimedETHAsCollateralizedSlotOwner";
+    env e; calldataarg args;
+    f(e, args);
 
-}
+    uint256 calculateETHForFreeFloatingOrCollateralizedHoldersAfter = calculateETHForFreeFloatingOrCollateralizedHolders();
+    uint256 lastSeenETHPerCollateralizedSlotPerKnotAfter = lastSeenETHPerCollateralizedSlotPerKnot();
 
-/**
- * getUnprocessedETHForAllFreeFloatingSlot: returns as expected
- */
-rule getUnprocessedETHForAllFreeFloatingSlotReturnsAsExpected() {
-
-    address staker;
-    bytes32 blsPubKey;
-
-    require calculateETHForFreeFloatingOrCollateralizedHolders() >= lastSeenETHPerFreeFloating();
-
-    assert getUnprocessedETHForAllFreeFloatingSlot() == calculateETHForFreeFloatingOrCollateralizedHolders() - lastSeenETHPerFreeFloating(), "Wrong value for getUnprocessedETHForAllFreeFloatingSlot";
-
-}
-
-/**
- * getUnprocessedETHForAllCollateralizedSlot: returns as expected
- */
-rule getUnprocessedETHForAllCollateralizedSlotReturnsAsExpected() {
-
-    address staker;
-    bytes32 blsPubKey;
-
-    require numberOfRegisteredKnots() > 0;
-    require calculateETHForFreeFloatingOrCollateralizedHolders() >= lastSeenETHPerCollateralizedSlotPerKnot();
-
-    assert getUnprocessedETHForAllCollateralizedSlot() == (calculateETHForFreeFloatingOrCollateralizedHolders() - lastSeenETHPerCollateralizedSlotPerKnot()) / numberOfRegisteredKnots(), "Wrong value for getUnprocessedETHForAllCollateralizedSlot";
-
-}
-
-/**
- * calculateNewAccumulatedETHPerFreeFloatingShare: returns as expected
- */
-rule calculateNewAccumulatedETHPerFreeFloatingShareReturnsAsExpected() {
-
-    address staker;
-    bytes32 blsPubKey;
-
-    assert calculateNewAccumulatedETHPerFreeFloatingShare() == (totalFreeFloatingShares() > 0 ? (getUnprocessedETHForAllFreeFloatingSlot() * PRECISION()) / totalFreeFloatingShares() : 0), "Wrong value for calculateNewAccumulatedETHPerFreeFloatingShare";
-
-}
-
-/**
- * calculateNewAccumulatedETHPerCollateralizedSharePerKnot: returns as expected
- */
-rule calculateNewAccumulatedETHPerCollateralizedSharePerKnotReturnsAsExpected() {
-
-    address staker;
-    bytes32 blsPubKey;
-
-    assert calculateNewAccumulatedETHPerCollateralizedSharePerKnot() == (getUnprocessedETHForAllCollateralizedSlot() + accumulatedETHPerCollateralizedSlotPerKnot()), "Wrong value for calculateNewAccumulatedETHPerCollateralizedSharePerKnot";
-
-}
-
-/**
- * totalETHReceived: returns as expected
- */
-rule totalETHReceivedReturnsAsExpected() {
-
-    assert totalETHReceived() == (getETHBalance(currentContract) + totalClaimed()), "Wrong value for totalETHReceived";
-
-}
-
-/**
- * calculateNewAccumulatedETHPerCollateralizedShare: returns as expected
- */
-rule calculateNewAccumulatedETHPerCollateralizedShareReturnsAsExpected() {
-
-    uint256 ethSinceLastUpdate;
-
-    assert calculateNewAccumulatedETHPerCollateralizedShare(ethSinceLastUpdate) == ((ethSinceLastUpdate * PRECISION()) / (numberOfRegisteredKnots() * 4000000000000000000)), "Wrong value for calculateNewAccumulatedETHPerCollateralizedShare";
-
-}
-
-/**
- * getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKey: returns as expected
- */
-rule getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKeyReturnsAsExpected() {
-
-    bytes32 blsPublicKey;
-
-    assert getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKey(blsPublicKey) == (lastAccumulatedETHPerFreeFloatingShare(blsPublicKey) > 0 ? lastAccumulatedETHPerFreeFloatingShare(blsPublicKey) : accumulatedETHPerFreeFloatingShare()), "Wrong value for getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKey";
-
+    assert calculateETHForFreeFloatingOrCollateralizedHoldersAfter >= lastSeenETHPerCollateralizedSlotPerKnotAfter, "calculateETHForFreeFloatingOrCollateralizedHolders be always greater or equal than lastSeenETHPerCollateralizedSlotPerKnot";
 }
 
 

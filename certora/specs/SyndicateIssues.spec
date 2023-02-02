@@ -14,7 +14,7 @@ methods {
     // slotSettlementRegistry
 	stakeHouseShareTokens(address) returns (address)  => DISPATCHER(true)
 	currentSlashedAmountOfSLOTForKnot(bytes32) returns (uint256)  => DISPATCHER(true)
-	numberOfCollateralisedSlotOwnersForKnot(bytes32) returns (uint256)  => DISPATCHER(true)
+	numberOfCollateralisedSlotOwnersForKnot(bytes32) returns (uint256)  => ALWAYS(0)
 	getCollateralisedOwnerAtIndex(bytes32, uint256) returns (address) => DISPATCHER(true)
 	totalUserCollateralisedSLOTBalanceForKnot(address, address, bytes32) returns (uint256) => DISPATCHER(true)
     // sETH
@@ -107,7 +107,15 @@ definition notHarnessCall(method f) returns bool =
     && f.selector != registerKnotsToSyndicate(bytes32).selector
     && f.selector != registerKnotsToSyndicate(bytes32,bytes32).selector
     && f.selector != addPriorityStakers(address).selector
-    && f.selector != addPriorityStakers(address,address).selector;
+    && f.selector != addPriorityStakers(address,address).selector
+    && f.selector != batchPreviewUnclaimedETHAsFreeFloatingStaker(address,bytes32).selector
+    && f.selector != getETHBalance(address).selector
+    && f.selector != calculateCollateralizedETHOwedPerKnot().selector
+    && f.selector != calculateNewAccumulatedETHPerCollateralizedShare(uint256).selector
+    && f.selector != getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKey(bytes32).selector
+    && f.selector != isInitialized().selector
+    && f.selector != initialize(address,uint256,address,bytes32).selector
+    && f.selector != getETHBalance(address).selector;
 
 
 /// Functions with onlyOwner modifier.
@@ -116,6 +124,14 @@ definition onlyOwnerFunctions(method f) returns bool =
     || f.selector == registerKnotsToSyndicate(bytes32[]).selector
     || f.selector == addPriorityStakers(address[]).selector
     || f.selector == updatePriorityStakingBlock(uint256).selector;
+
+
+/// Functions that internally call _updateCollateralizedSlotOwnersLiabilitySnapshot.
+definition callsToLiabilitySnapshot(method f) returns bool = 
+    f.selector == claimAsCollateralizedSLOTOwner(address,bytes32[]).selector
+    || f.selector == updateCollateralizedSlotOwnersAccruedETH(bytes32).selector
+    || f.selector == batchUpdateCollateralizedSlotOwnersAccruedETH(bytes32[]).selector
+    || f.selector == deRegisterKnots(bytes32[]).selector;
 
 
 /// Corrollary that can be used as requirement after sETH solvency is proven.
@@ -128,12 +144,12 @@ function sETHSolvencyCorrollary(address user1, address user2, bytes32 knot) retu
 --------------------------------------------------*/
 
 /**
- *  after any function call, if a knot is deregistered it should be stored in lastAccumulatedETHPerFreeFloatingShare
+ *  After any function call, if a knot is deregistered it should be stored in lastAccumulatedETHPerFreeFloatingShare
  *  the last accumulatedETHPerFreeFloatingShare
  *
- *  Summary: Here you should elaborate on concrete values given by the prover if they exist, e.g., “ The withdraw function is prone to underflow - the balance before a withdrawal was 1, the amount to be withdrawn from the same address was 2, after the withdrawal, the balance is max_uint.”
- *  Expected behaviour: 
- *  References: 
+ *  Summary: When a knot is deregistered the value snaphotted in lastAccumulatedETHPerFreeFloatingShare must be the updated value of accumulatedETHPerFreeFloatingShare.
+ *  Expected behaviour: If lastAccumulatedETHPerFreeFloatingShare is populated, meaning the knot has been deregistered, it has to be with the updated value of accumulatedETHPerFreeFloatingShare, so any call to updateAccruedETHPerShares() after that should not change the value of accumulatedETHPerFreeFloatingShare.
+ *  References: https://github.com/Certora/2023-01-blockswap-fv/blob/certora/contracts/syndicate/Syndicate.sol#L345-L357
  */
 rule lastAccumulatedETHPerFreeFloatingShareMustAccountForAccruedETH(method f) filtered {
     f -> notHarnessCall(f)
@@ -158,40 +174,59 @@ rule lastAccumulatedETHPerFreeFloatingShareMustAccountForAccruedETH(method f) fi
 
 }
 
-
-/*-------------------------------------------------
-|         Invariants, ghosts and hooks             |
---------------------------------------------------*/
-
 /**
- * Ghost to account for the registration of knots
+ * Check that if totalETHProcessedPerCollateralizedKnot was bigger than accruedEarningPerCollateralizedSlotOwnerOfKnot 
+ * it still is after any call to functions that call _updateCollateralizedSlotOwnersLiabilitySnapshot.
+ * WARNING: I filter by callsToLiabilitySnapshot but force to call only function updateCollateralizedSlotOwnersAccruedETH to avoid timeouts
+ *
+ *  Summary: The value of accruedEarningPerCollateralizedSlotOwnerOfKnot cannot increase more than the value of the rewards being distributed
+ *  Expected behaviour: the value of increase of totalETHProcessedPerCollateralizedKnot after a call that calls _updateCollateralizedSlotOwnersLiabilitySnapshot must be greater or equal than the amount of increase of accrued rewards for a single user 
+ *  References: https://github.com/Certora/2023-01-blockswap-fv/blob/certora/contracts/syndicate/Syndicate.sol#L545-L564
  */
- /*
-ghost mathint registeredKnotsCount {
-    init_state axiom registeredKnotsCount == 0 ;
+rule checkChangeInTotalETHProcessedPerCollateralized(method f) filtered {
+    f -> callsToLiabilitySnapshot(f) && f.selector == updateCollateralizedSlotOwnersAccruedETH(bytes32).selector
+}{
+
+    env e;
+
+    bytes32 blsPubKey;
+    address account;
+
+    require isKnotRegistered(blsPubKey);
+    require totalETHProcessedPerCollateralizedKnot(blsPubKey) >= accruedEarningPerCollateralizedSlotOwnerOfKnot(blsPubKey, account);
+
+    uint256 totalETHProcessedPerCollateralizedBefore = totalETHProcessedPerCollateralizedKnot(blsPubKey);
+
+    calldataarg args;
+    f(e, args);
+
+    assert 
+        totalETHProcessedPerCollateralizedKnot(blsPubKey) >= accruedEarningPerCollateralizedSlotOwnerOfKnot(blsPubKey, account)
+        , "totalETHProcessedPerCollateralizedKnot cannot be less than accruedEarningPerCollateralizedSlotOwnerOfKnot";
+
 }
-*/
-    
+
 /**
- * Hook to update the ghost registeredKnotsCount on every change to the mapping isKnotRegistered
+ * Check that if numberOfCollateralisedSlotOwnersForKnot is zero, totalETHProcessedPerCollateralizedKnot. should not change
+ * WARNING: I used here the summarization ALWAYS(0) to force the return value of numberOfCollateralisedSlotOwnersForKnot. I could not manage to use the implementation (did'nt work) and run out of time.
+ *
+ *  Summary: If numberOfCollateralisedSlotOwnersForKnot is equal to zero, the value of totalETHProcessedPerCollateralizedKnot should not change after any call.
+ *  Expected behaviour: If no slot owners exist for a given knot, the value of ETH processed of a knot shouldn't change after any call of the contract. But in _updateCollateralizedSlotOwnersLiabilitySnapshot the value is updated accounting for all accrued rewards of the knot regarding of the number of owners.
+ *  References: https://github.com/Certora/2023-01-blockswap-fv/blob/certora/contracts/syndicate/Syndicate.sol#L563-L564
  */
- /*
-hook Sstore isKnotRegistered[KEY bytes32 blsPubKey] bool newValue (bool oldValue) STORAGE {
-    if(newValue != oldValue){
-        if(newValue) registeredKnotsCount = registeredKnotsCount + 1;
-        else registeredKnotsCount = registeredKnotsCount - 1;
-    }
+rule checkNumberOfCollateralisedSlotOwnersForKnotIsZeroNoChangeInTotal(method f) filtered {
+    f -> notHarnessCall(f)
+}{
+
+    env e;
+
+    bytes32 blsPubKey;
+
+    uint256 totalETHProcessedPerCollateralizedBefore = totalETHProcessedPerCollateralizedKnot(blsPubKey);
+
+    calldataarg args;
+    f(e, args);
+
+    assert totalETHProcessedPerCollateralizedKnot(blsPubKey) == totalETHProcessedPerCollateralizedBefore;
+
 }
-*/
-
-/**
- * Address 0 must have zero sETH balance.
- */
-invariant addressZeroHasNoBalance()
-    sETHToken.balanceOf(0) == 0
-
-/**
- * The ghost registeredKnotsCount must be always equal to numberOfRegisteredKnots.
- */
-invariant registeredKnotsCountCorrect()
-    registeredKnotsCount == numberOfRegisteredKnots()

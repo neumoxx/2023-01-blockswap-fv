@@ -1,4 +1,5 @@
 using MocksETH as sETHToken
+using MockSlotSettlementRegistry as slotSettlementRegistry
 
 methods {
     //// Regular methods
@@ -12,11 +13,11 @@ methods {
     // stakeHouseRegistry
     getMemberInfo(bytes32) returns (address,uint256,uint16,bool) => DISPATCHER(true) // not used directly by Syndicate
     // slotSettlementRegistry
-	stakeHouseShareTokens(address) returns (address)  => DISPATCHER(true)
-	currentSlashedAmountOfSLOTForKnot(bytes32) returns (uint256)  => DISPATCHER(true)
-	numberOfCollateralisedSlotOwnersForKnot(bytes32) returns (uint256)  => DISPATCHER(true)
-	getCollateralisedOwnerAtIndex(bytes32, uint256) returns (address) => DISPATCHER(true)
-	totalUserCollateralisedSLOTBalanceForKnot(address, address, bytes32) returns (uint256) => DISPATCHER(true)
+	slotSettlementRegistry.stakeHouseShareTokens(address) returns (address) envfree
+	slotSettlementRegistry.currentSlashedAmountOfSLOTForKnot(bytes32) returns (uint256)
+	slotSettlementRegistry.numberOfCollateralisedSlotOwnersForKnot(bytes32) returns (uint256) envfree
+	slotSettlementRegistry.getCollateralisedOwnerAtIndex(bytes32, uint256) returns (address) envfree
+	slotSettlementRegistry.totalUserCollateralisedSLOTBalanceForKnot(address, address, bytes32) returns (uint256)
     // sETH
     sETHToken.balanceOf(address) returns (uint256) envfree
     // ERC20
@@ -108,7 +109,15 @@ definition notHarnessCall(method f) returns bool =
     && f.selector != registerKnotsToSyndicate(bytes32).selector
     && f.selector != registerKnotsToSyndicate(bytes32,bytes32).selector
     && f.selector != addPriorityStakers(address).selector
-    && f.selector != addPriorityStakers(address,address).selector;
+    && f.selector != addPriorityStakers(address,address).selector
+    && f.selector != batchPreviewUnclaimedETHAsFreeFloatingStaker(address,bytes32).selector
+    && f.selector != getETHBalance(address).selector
+    && f.selector != calculateCollateralizedETHOwedPerKnot().selector
+    && f.selector != calculateNewAccumulatedETHPerCollateralizedShare(uint256).selector
+    && f.selector != getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKey(bytes32).selector
+    && f.selector != isInitialized().selector
+    && f.selector != initialize(address,uint256,address,bytes32).selector
+    && f.selector != getETHBalance(address).selector;
 
 
 /// Functions with onlyOwner modifier.
@@ -434,191 +443,39 @@ rule unstakeCannotUnstakeMoreThanTheKnotBalance() {
 
 }
 
-/**
- * unstake: unclaimedETHRecipient cannot be address(0) or current contract
- * (when testing with bug10.patch the rule still passes, because _claimAsStaker 
- * also checks that unclaimedETHRecipient != address(0). Leaving rule just in case)
- */
-rule unstakeUnclaimedETHRecipientNotZeroOrThis() {
-
-    env e;
-
-    address unclaimedETHRecipient;
-    address sETHRecipient;
-    bytes32 blsPubKey;
-    uint256 sETHAmount;
-
-    require unclaimedETHRecipient == 0 || unclaimedETHRecipient == currentContract;
-
-    unstake@withrevert(e, unclaimedETHRecipient, sETHRecipient, blsPubKey, sETHAmount);
-
-    assert lastReverted, "UnclaimedETHRecipient cannot be address(0) or current contract";
-
-}
-
-/**
- * unstake: knot must be registered
- */
-rule unstakeKnotMustBeRegistered() {
-
-    env e;
-
-    address unclaimedETHRecipient;
-    address sETHRecipient;
-    bytes32 blsPubKey;
-    uint256 sETHAmount;
-
-    require !isKnotRegistered(blsPubKey);
-
-    unstake@withrevert(e, unclaimedETHRecipient, sETHRecipient, blsPubKey, sETHAmount);
-
-    assert lastReverted, "Knot must be registered";
-
-}
-
-/**
- * √ claimAsCollateralizedSLOTOwner: recipient cannot be address(0) or current contract
- */
-rule claimAsCollateralizedRecipientNotZeroOrThis() {
-
-    env e;
-
-    address recipient;
-    bytes32 blsPubKey;
-
-    require recipient == 0 || recipient == currentContract;
-
-    claimAsCollateralizedSLOTOwner@withrevert(e, recipient, blsPubKey);
-
-    assert lastReverted, "Recipient cannot be address(0) or current contract";
-
-}
-
-/**
- * √ claimAsCollateralizedSLOTOwner: knot must be registered
- */
-rule claimAsCollateralizedKnotMustBeRegistered() {
-
-    env e;
-
-    address recipient;
-    bytes32 blsPubKey;
-
-    require !isKnotRegistered(blsPubKey);
-
-    claimAsCollateralizedSLOTOwner@withrevert(e, recipient, blsPubKey);
-
-    assert lastReverted, "Knot must be registered";
-
-}
-
-/**
- * √ registerKnotsToSyndicate: cannot register knot if already registered
- */
-rule registerKnotsToSyndicateKnotMustNotBeRegistered() {
-
-    env e;
-
-    bytes32 blsPubKey;
-
-    require isKnotRegistered(blsPubKey);
-
-    registerKnotsToSyndicate@withrevert(e, blsPubKey);
-
-    assert lastReverted, "Cannot register knot if already registered";
-
-}
-
-/**
- * registerKnotsToSyndicate: after the call, the knot is effectively registered
- */
-rule registerKnotsToSyndicateKnotMustEndUpRegistered() {
-
-    env e;
-
-    bytes32 blsPubKey;
-
-    require !isKnotRegistered(blsPubKey);
-
-    registerKnotsToSyndicate(e, blsPubKey);
-
-    assert isKnotRegistered(blsPubKey), "Could not register knot";
-
-}
-
-/**
- * √ deregisterKnots: cannot deregister knot if if it's no longer part of syndicate
- */
-rule deregisterKnotsKnotMustBePartOfSyndicate() {
-
-    env e;
-
-    bytes32 blsPubKey;
-
-    require isNoLongerPartOfSyndicate(blsPubKey);
-
-    deRegisterKnots@withrevert(e, blsPubKey);
-
-    assert lastReverted, "Cannot deregister knot if if it's no longer part of syndicate";
-
-}
-
-/**
- * √ deregisterKnots: after call, knot must end up deregistered
- */
-rule deregisterKnotsKnotMustEndUpDeregistered() {
-
-    env e;
-
-    bytes32 blsPubKey;
-
-    deRegisterKnots(e, blsPubKey);
-
-    assert isNoLongerPartOfSyndicate(blsPubKey), "Could not deregister knot";
-
-}
-
-/**
- * √ claimAsStaker: recipient cannot be address(0) or current contract
- */
-rule claimAsStakerRecipientNotZeroOrThis() {
-
-    env e;
-
-    address recipient;
-    bytes32 blsPubKey;
-
-    require recipient == 0 || recipient == currentContract;
-
-    claimAsStaker@withrevert(e, recipient, blsPubKey);
-
-    assert lastReverted, "Recipient cannot be address(0) or current contract";
-
-}
-
-/**
- * √ claimAsStaker: knot must be registered
- */
-rule claimAsStakerKnotMustBeRegistered() {
-
-    env e;
-
-    address recipient;
-    bytes32 blsPubKey;
-
-    require !isKnotRegistered(blsPubKey);
-
-    claimAsStaker@withrevert(e, recipient, blsPubKey);
-
-    assert lastReverted, "Knot must be registered";
-
-}
-
 
 
 /*-------------------------------------------------
 |         Invariants, ghosts and hooks             |
 --------------------------------------------------*/
+
+/**
+ * Ghost 1 to account for the total stake of sETH
+ */
+ghost mathint sETHTotalStake1 {
+    init_state axiom sETHTotalStake1 == 0 ;
+}
+
+/**
+ * Ghost 2 to account for the total stake of sETH
+ */
+ghost mathint sETHTotalStake2 {
+    init_state axiom sETHTotalStake2 == 0 ;
+}
+    
+/**
+ * Hook to update the ghost sETHTotalStake1 on every change to the mapping sETHTotalStakeForKnot
+ */
+hook Sstore sETHTotalStakeForKnot[KEY bytes32 blsPubKey] uint256 newValue (uint256 oldValue) STORAGE {
+    sETHTotalStake1 = sETHTotalStake1 + newValue - oldValue;
+}
+    
+/**
+ * Hook to update the ghost sETHTotalStake2 on every change to the mapping sETHStakedBalanceForKnot
+ */
+hook Sstore sETHStakedBalanceForKnot[KEY bytes32 blsPubKey][KEY address account] uint256 newValue (uint256 oldValue) STORAGE {
+    sETHTotalStake2 = sETHTotalStake2 + newValue - oldValue;
+}
 
 /**
  * Address 0 must have zero sETH balance.
@@ -631,3 +488,15 @@ invariant addressZeroHasNoBalance()
  */
 invariant noLongerPartOfSyndicateImpliesRegistered(bytes32 blsPubKey)
     isNoLongerPartOfSyndicate(blsPubKey) => isKnotRegistered(blsPubKey)
+
+/**
+ * totalETHProcessedPerCollateralizedKnot always less than or equal than accumulatedETHPerCollateralizedSlotPerKnot.
+ */
+invariant accumulatedETHPerCollateralizedSlotPerKnotGTEtotalETHProcessedPerCollateralizedKnot(bytes32 blsPubKey)
+    totalETHProcessedPerCollateralizedKnot(blsPubKey) <= accumulatedETHPerCollateralizedSlotPerKnot()
+
+/**
+ * sETHTotalStake1 and sETHTotalStake2 must match.
+ */
+invariant sETHTotalStakeGhostsMatch()
+    sETHTotalStake1 == sETHTotalStake2

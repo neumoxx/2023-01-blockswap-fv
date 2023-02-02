@@ -1,4 +1,6 @@
 using MocksETH as sETHToken
+using MockSlotSettlementRegistry as slotSettlementRegistry
+using MockStakeHouseUniverse as stakeHouseUniverse
 
 methods {
     //// Regular methods
@@ -7,16 +9,16 @@ methods {
 
     //// Resolving external calls
 	// stakeHouseUniverse
-	stakeHouseKnotInfo(bytes32) returns (address,address,address,uint256,uint256,bool) => DISPATCHER(true)
-    memberKnotToStakeHouse(bytes32) returns (address) => DISPATCHER(true) // not used directly by Syndicate
+	stakeHouseUniverse.stakeHouseKnotInfo(bytes32) returns (address,address,address,uint256,uint256,bool) envfree
+    stakeHouseUniverse.memberKnotToStakeHouse(bytes32) returns (address) envfree
     // stakeHouseRegistry
     getMemberInfo(bytes32) returns (address,uint256,uint16,bool) => DISPATCHER(true) // not used directly by Syndicate
     // slotSettlementRegistry
-	stakeHouseShareTokens(address) returns (address)  => DISPATCHER(true)
-	currentSlashedAmountOfSLOTForKnot(bytes32) returns (uint256)  => DISPATCHER(true)
-	numberOfCollateralisedSlotOwnersForKnot(bytes32) returns (uint256)  => DISPATCHER(true)
-	getCollateralisedOwnerAtIndex(bytes32, uint256) returns (address) => DISPATCHER(true)
-	totalUserCollateralisedSLOTBalanceForKnot(address, address, bytes32) returns (uint256) => DISPATCHER(true)
+	slotSettlementRegistry.stakeHouseShareTokens(address) returns (address) envfree
+	slotSettlementRegistry.currentSlashedAmountOfSLOTForKnot(bytes32) returns (uint256)
+	slotSettlementRegistry.numberOfCollateralisedSlotOwnersForKnot(bytes32) returns (uint256) envfree
+	slotSettlementRegistry.getCollateralisedOwnerAtIndex(bytes32, uint256) returns (address) envfree
+	slotSettlementRegistry.totalUserCollateralisedSLOTBalanceForKnot(address, address, bytes32) returns (uint256)
     // sETH
     sETHToken.balanceOf(address) returns (uint256) envfree
     // ERC20
@@ -133,165 +135,84 @@ function sETHSolvencyCorrollary(address user1, address user2, bytes32 knot) retu
 }
 
 /*-------------------------------------------------
-|         View functions return values             |
+|                  Unit tests                      |
 --------------------------------------------------*/
 
 /**
- * calculateUnclaimedFreeFloatingETHShare: returns as expected
+ * unstake: unclaimedETHRecipient cannot be address(0) or current contract
+ * (when testing with bug10.patch the rule still passes, because _claimAsStaker 
+ * also checks that unclaimedETHRecipient != address(0). Leaving rule just in case)
  */
-rule calculateUnclaimedFreeFloatingETHShareReturnsAsExpected() {
+rule unstakeUnclaimedETHRecipientNotZeroOrThis() {
 
     env e;
 
-    address user;
+    address unclaimedETHRecipient;
+    address sETHRecipient;
+    bytes32 blsPubKey;
+    uint256 sETHAmount;
+
+    require unclaimedETHRecipient == 0 || unclaimedETHRecipient == currentContract;
+
+    unstake@withrevert(e, unclaimedETHRecipient, sETHRecipient, blsPubKey, sETHAmount);
+
+    assert lastReverted, "UnclaimedETHRecipient cannot be address(0) or current contract";
+
+}
+
+/**
+ * unstake: knot must be registered
+ */
+rule unstakeKnotMustBeRegistered() {
+
+    env e;
+
+    address unclaimedETHRecipient;
+    address sETHRecipient;
+    bytes32 blsPubKey;
+    uint256 sETHAmount;
+
+    require !isKnotRegistered(blsPubKey);
+
+    unstake@withrevert(e, unclaimedETHRecipient, sETHRecipient, blsPubKey, sETHAmount);
+
+    assert lastReverted, "Knot must be registered";
+
+}
+
+/**
+ * √ claimAsCollateralizedSLOTOwner: recipient cannot be address(0) or current contract
+ */
+rule claimAsCollateralizedRecipientNotZeroOrThis() {
+
+    env e;
+
+    address recipient;
     bytes32 blsPubKey;
 
-    uint256 stakedBal = sETHStakedBalanceForKnot(blsPubKey, user);
+    require recipient == 0 || recipient == currentContract;
 
-    uint256 accumulatedETHPerShare = lastAccumulatedETHPerFreeFloatingShare(blsPubKey) > 0 ?
-        lastAccumulatedETHPerFreeFloatingShare(blsPubKey) :
-        accumulatedETHPerFreeFloatingShare();
+    claimAsCollateralizedSLOTOwner@withrevert(e, recipient, blsPubKey);
 
-    uint256 userShare = (accumulatedETHPerShare * stakedBal) / PRECISION();
-    
-
-    assert stakedBal < 1000000000 => calculateUnclaimedFreeFloatingETHShare(blsPubKey, user) == 0, "Wrong value for calculateUnclaimedFreeFloatingETHShare";
-    assert stakedBal >= 1000000000 => calculateUnclaimedFreeFloatingETHShare(blsPubKey, user) == userShare - sETHUserClaimForKnot(blsPubKey, user), "Wrong value for calculateUnclaimedFreeFloatingETHShare";
+    assert lastReverted, "Recipient cannot be address(0) or current contract";
 
 }
 
 /**
- * calculateETHForFreeFloatingOrCollateralizedHolders: returns as expected
+ * √ claimAsCollateralizedSLOTOwner: knot must be registered
  */
-rule calculateETHForFreeFloatingOrCollateralizedHoldersReturnsAsExpected() {
+rule claimAsCollateralizedKnotMustBeRegistered() {
 
-    assert calculateETHForFreeFloatingOrCollateralizedHolders() == (totalETHReceived() / 2), "Wrong value for calculateETHForFreeFloatingOrCollateralizedHolders";
+    env e;
 
-}
-
-/**
- * batchPreviewUnclaimedETHAsFreeFloatingStaker: returns as expected
- */
-rule batchPreviewUnclaimedETHAsFreeFloatingStakerReturnsAsExpected() {
-
-    address staker;
+    address recipient;
     bytes32 blsPubKey;
 
-    assert batchPreviewUnclaimedETHAsFreeFloatingStaker(staker, blsPubKey) == previewUnclaimedETHAsFreeFloatingStaker(staker, blsPubKey), "Wrong value for batchPreviewUnclaimedETHAsFreeFloatingStaker";
+    require !isKnotRegistered(blsPubKey);
 
-}
+    claimAsCollateralizedSLOTOwner@withrevert(e, recipient, blsPubKey);
 
-/**
- * previewUnclaimedETHAsFreeFloatingStaker: returns as expected
- */
-rule previewUnclaimedETHAsFreeFloatingStakerReturnsAsExpected() {
-
-    address user;
-    bytes32 blsPubKey;
-
-    uint256 stakedBal = sETHStakedBalanceForKnot(blsPubKey, user);
-
-    uint256 accumulatedETHPerShare = accumulatedETHPerFreeFloatingShare() + calculateNewAccumulatedETHPerFreeFloatingShare();
-
-    uint256 userShare = (accumulatedETHPerShare * stakedBal) / PRECISION();
-
-    assert previewUnclaimedETHAsFreeFloatingStaker(user, blsPubKey) == userShare - sETHUserClaimForKnot(blsPubKey, user), "Wrong value for previewUnclaimedETHAsFreeFloatingStaker";
-
-}
-
-/**
- * batchPreviewUnclaimedETHAsCollateralizedSlotOwner: returns as expected
- */
-rule batchPreviewUnclaimedETHAsCollateralizedSlotOwnerReturnsAsExpected() {
-
-    address staker;
-    bytes32 blsPubKey;
-
-    assert batchPreviewUnclaimedETHAsCollateralizedSlotOwner(staker, blsPubKey) == previewUnclaimedETHAsCollateralizedSlotOwner(staker, blsPubKey), "Wrong value for batchPreviewUnclaimedETHAsCollateralizedSlotOwner";
-
-}
-
-/**
- * getUnprocessedETHForAllFreeFloatingSlot: returns as expected
- */
-rule getUnprocessedETHForAllFreeFloatingSlotReturnsAsExpected() {
-
-    address staker;
-    bytes32 blsPubKey;
-
-    require calculateETHForFreeFloatingOrCollateralizedHolders() >= lastSeenETHPerFreeFloating();
-
-    assert getUnprocessedETHForAllFreeFloatingSlot() == calculateETHForFreeFloatingOrCollateralizedHolders() - lastSeenETHPerFreeFloating(), "Wrong value for getUnprocessedETHForAllFreeFloatingSlot";
-
-}
-
-/**
- * getUnprocessedETHForAllCollateralizedSlot: returns as expected
- */
-rule getUnprocessedETHForAllCollateralizedSlotReturnsAsExpected() {
-
-    address staker;
-    bytes32 blsPubKey;
-
-    require numberOfRegisteredKnots() > 0;
-    require calculateETHForFreeFloatingOrCollateralizedHolders() >= lastSeenETHPerCollateralizedSlotPerKnot();
-
-    assert getUnprocessedETHForAllCollateralizedSlot() == (calculateETHForFreeFloatingOrCollateralizedHolders() - lastSeenETHPerCollateralizedSlotPerKnot()) / numberOfRegisteredKnots(), "Wrong value for getUnprocessedETHForAllCollateralizedSlot";
-
-}
-
-/**
- * calculateNewAccumulatedETHPerFreeFloatingShare: returns as expected
- */
-rule calculateNewAccumulatedETHPerFreeFloatingShareReturnsAsExpected() {
-
-    address staker;
-    bytes32 blsPubKey;
-
-    assert calculateNewAccumulatedETHPerFreeFloatingShare() == (totalFreeFloatingShares() > 0 ? (getUnprocessedETHForAllFreeFloatingSlot() * PRECISION()) / totalFreeFloatingShares() : 0), "Wrong value for calculateNewAccumulatedETHPerFreeFloatingShare";
-
-}
-
-/**
- * calculateNewAccumulatedETHPerCollateralizedSharePerKnot: returns as expected
- */
-rule calculateNewAccumulatedETHPerCollateralizedSharePerKnotReturnsAsExpected() {
-
-    address staker;
-    bytes32 blsPubKey;
-
-    assert calculateNewAccumulatedETHPerCollateralizedSharePerKnot() == (getUnprocessedETHForAllCollateralizedSlot() + accumulatedETHPerCollateralizedSlotPerKnot()), "Wrong value for calculateNewAccumulatedETHPerCollateralizedSharePerKnot";
-
-}
-
-/**
- * totalETHReceived: returns as expected
- */
-rule totalETHReceivedReturnsAsExpected() {
-
-    assert totalETHReceived() == (getETHBalance(currentContract) + totalClaimed()), "Wrong value for totalETHReceived";
-
-}
-
-/**
- * calculateNewAccumulatedETHPerCollateralizedShare: returns as expected
- */
-rule calculateNewAccumulatedETHPerCollateralizedShareReturnsAsExpected() {
-
-    uint256 ethSinceLastUpdate;
-
-    assert calculateNewAccumulatedETHPerCollateralizedShare(ethSinceLastUpdate) == ((ethSinceLastUpdate * PRECISION()) / (numberOfRegisteredKnots() * 4000000000000000000)), "Wrong value for calculateNewAccumulatedETHPerCollateralizedShare";
-
-}
-
-/**
- * getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKey: returns as expected
- */
-rule getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKeyReturnsAsExpected() {
-
-    bytes32 blsPublicKey;
-
-    assert getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKey(blsPublicKey) == (lastAccumulatedETHPerFreeFloatingShare(blsPublicKey) > 0 ? lastAccumulatedETHPerFreeFloatingShare(blsPublicKey) : accumulatedETHPerFreeFloatingShare()), "Wrong value for getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKey";
+    assert lastReverted, "Knot must be registered";
 
 }
 
@@ -300,15 +221,3 @@ rule getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKeyReturnsAsExpecte
 /*-------------------------------------------------
 |         Invariants, ghosts and hooks             |
 --------------------------------------------------*/
-
-/**
- * Address 0 must have zero sETH balance.
- */
-invariant addressZeroHasNoBalance()
-    sETHToken.balanceOf(0) == 0
-
-/**
- * If knot is no longer part of syndicate, it must be registered
- */
-invariant noLongerPartOfSyndicateImpliesRegistered(bytes32 blsPubKey)
-    isNoLongerPartOfSyndicate(blsPubKey) => isKnotRegistered(blsPubKey)

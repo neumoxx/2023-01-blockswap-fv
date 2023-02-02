@@ -108,7 +108,15 @@ definition notHarnessCall(method f) returns bool =
     && f.selector != registerKnotsToSyndicate(bytes32).selector
     && f.selector != registerKnotsToSyndicate(bytes32,bytes32).selector
     && f.selector != addPriorityStakers(address).selector
-    && f.selector != addPriorityStakers(address,address).selector;
+    && f.selector != addPriorityStakers(address,address).selector
+    && f.selector != batchPreviewUnclaimedETHAsFreeFloatingStaker(address,bytes32).selector
+    && f.selector != getETHBalance(address).selector
+    && f.selector != calculateCollateralizedETHOwedPerKnot().selector
+    && f.selector != calculateNewAccumulatedETHPerCollateralizedShare(uint256).selector
+    && f.selector != getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKey(bytes32).selector
+    && f.selector != isInitialized().selector
+    && f.selector != initialize(address,uint256,address,bytes32).selector
+    && f.selector != getETHBalance(address).selector;
 
 
 /// Functions with onlyOwner modifier.
@@ -124,144 +132,9 @@ function sETHSolvencyCorrollary(address user1, address user2, bytes32 knot) retu
     return sETHStakedBalanceForKnot(knot,user1) + sETHStakedBalanceForKnot(knot,user2) <= sETHTotalStakeForKnot(knot);
 }
 
-
 /*-------------------------------------------------
-|               High level rules                   |
+|       Unstake with non reverting token           |
 --------------------------------------------------*/
-
-/**
- * Total ETH received must not decrease.
- */
-rule totalEthReceivedMonotonicallyIncreases(method f) filtered {
-    f -> notHarnessCall(f)
-}{
-    
-    uint256 totalEthReceivedBefore = totalETHReceived();
-
-    env e; calldataarg args;
-    f(e, args);
-
-    uint256 totalEthReceivedAfter = totalETHReceived();
-
-    assert totalEthReceivedAfter >= totalEthReceivedBefore, "total ether received must not decrease";
-}
-
-/**
- * accumulatedETHPerFreeFloatingShare must not decrease.
- */
-rule accumulatedETHPerFreeFloatingShareMonotonicallyIncreases(method f) filtered {
-    f -> notHarnessCall(f)
-}{
-    
-    uint256 accumulatedETHPerFreeFloatingShareBefore = accumulatedETHPerFreeFloatingShare();
-
-    env e; calldataarg args;
-    f(e, args);
-
-    uint256 accumulatedETHPerFreeFloatingShareAfter = accumulatedETHPerFreeFloatingShare();
-
-    assert accumulatedETHPerFreeFloatingShareAfter >= accumulatedETHPerFreeFloatingShareBefore, "accumulatedETHPerFreeFloatingShare must not decrease";
-}
-
-/**
- * accumulatedETHPerCollateralizedSlotPerKnot must not decrease.
- */
-rule accumulatedETHPerCollateralizedSlotPerKnotMonotonicallyIncreases(method f) filtered {
-    f -> notHarnessCall(f)
-}{
-    
-    uint256 accumulatedETHPerCollateralizedSlotPerKnotBefore = accumulatedETHPerCollateralizedSlotPerKnot();
-
-    env e; calldataarg args;
-    f(e, args);
-
-    uint256 accumulatedETHPerCollateralizedSlotPerKnotAfter = accumulatedETHPerCollateralizedSlotPerKnot();
-
-    assert accumulatedETHPerCollateralizedSlotPerKnotAfter >= accumulatedETHPerCollateralizedSlotPerKnotBefore, "accumulatedETHPerCollateralizedSlotPerKnot must not decrease";
-}
-
-/**
- * lastSeenETHPerCollateralizedSlotPerKnot must not decrease.
- */
-rule lastSeenETHPerCollateralizedSlotPerKnotMonotonicallyIncreases(method f) filtered {
-    f -> notHarnessCall(f)
-}{
-    
-    uint256 lastSeenETHPerCollateralizedSlotPerKnotBefore = lastSeenETHPerCollateralizedSlotPerKnot();
-
-    env e; calldataarg args;
-    f(e, args);
-
-    uint256 lastSeenETHPerCollateralizedSlotPerKnotAfter = lastSeenETHPerCollateralizedSlotPerKnot();
-
-    assert lastSeenETHPerCollateralizedSlotPerKnotAfter >= lastSeenETHPerCollateralizedSlotPerKnotBefore, "lastSeenETHPerCollateralizedSlotPerKnot must not decrease";
-}
-
-/**
- * calculateETHForFreeFloatingOrCollateralizedHolders must be always greater or equal than lastSeenETHPerCollateralizedSlotPerKnot.
- */
-rule calculatedETHGTElastSeenETHPerCollateralizedSlotPerKnot(method f) filtered {
-    f -> notHarnessCall(f)
-}{
-    
-    uint256 calculateETHForFreeFloatingOrCollateralizedHoldersBefore = calculateETHForFreeFloatingOrCollateralizedHolders();
-    uint256 lastSeenETHPerCollateralizedSlotPerKnotBefore = lastSeenETHPerCollateralizedSlotPerKnot();
-
-    require calculateETHForFreeFloatingOrCollateralizedHoldersBefore > lastSeenETHPerCollateralizedSlotPerKnotBefore;
-
-    env e; calldataarg args;
-    f(e, args);
-
-    uint256 calculateETHForFreeFloatingOrCollateralizedHoldersAfter = calculateETHForFreeFloatingOrCollateralizedHolders();
-    uint256 lastSeenETHPerCollateralizedSlotPerKnotAfter = lastSeenETHPerCollateralizedSlotPerKnot();
-
-    assert calculateETHForFreeFloatingOrCollateralizedHoldersAfter >= lastSeenETHPerCollateralizedSlotPerKnotAfter, "calculateETHForFreeFloatingOrCollateralizedHolders be always greater or equal than lastSeenETHPerCollateralizedSlotPerKnot";
-}
-
-/**
- * calculateETHForFreeFloatingOrCollateralizedHolders must be always greater or equal than lastSeenETHPerFreeFloating.
- */
-rule calculatedETHGTElastSeenETHPerFreeFloating(method f) filtered {
-    f -> notHarnessCall(f)
-}{
-    
-    uint256 calculateETHForFreeFloatingOrCollateralizedHoldersBefore = calculateETHForFreeFloatingOrCollateralizedHolders();
-    uint256 lastSeenETHPerFreeFloatingBefore = lastSeenETHPerFreeFloating();
-
-    require calculateETHForFreeFloatingOrCollateralizedHoldersBefore > lastSeenETHPerFreeFloatingBefore;
-
-    env e; calldataarg args;
-    f(e, args);
-
-    uint256 calculateETHForFreeFloatingOrCollateralizedHoldersAfter = calculateETHForFreeFloatingOrCollateralizedHolders();
-    uint256 lastSeenETHPerFreeFloatingAfter = lastSeenETHPerFreeFloating();
-
-    assert calculateETHForFreeFloatingOrCollateralizedHoldersAfter >= lastSeenETHPerFreeFloatingAfter, "calculateETHForFreeFloatingOrCollateralizedHolders be always greater or equal than lastSeenETHPerFreeFloating";
-}
-
-/**
- * claimAsStaker: after execution, ETH balance of recipient (and total claimed) should increase same value as preview unclaimed of msg.sender
- * decreases
- */
-rule claimAsStakerPostBalances() {
-
-    env e;
-
-    address recipient;
-    bytes32 blsPubKey;
-
-    uint256 previewBefore = previewUnclaimedETHAsFreeFloatingStaker(e.msg.sender, blsPubKey);
-    uint256 recipientBalanceBefore = getETHBalance(recipient);
-    uint256 totalClaimedBefore = totalClaimed();
-
-    require sETHStakedBalanceForKnot(blsPubKey, e.msg.sender) >= 1000000000;
-
-    claimAsStaker(e, recipient, blsPubKey);
-
-    assert totalClaimed() - totalClaimedBefore == getETHBalance(recipient) - recipientBalanceBefore, "ETH balance of recipient after claim is wrong";
-    assert previewBefore - previewUnclaimedETHAsFreeFloatingStaker(e.msg.sender, blsPubKey) == getETHBalance(recipient) - recipientBalanceBefore, "ETH balance of recipient after claim is wrong";
-
-}
 
 /**
  * unstake: after execution, ETH balance of recipient varies by the same amount as totalClaimed.
@@ -284,26 +157,6 @@ rule unstakePostBalances() {
 
     assert totalClaimed() - totalClaimedBefore == getETHBalance(recipient) - recipientBalanceBefore, "ETH balance of recipient after unstake is wrong";
     
-}
-
-/**
- * if a knot is registered, it cannot be marked as not registered.
- */
-rule knotRegisteredCannotBeDeregistered(method f) filtered {
-    f -> notHarnessCall(f)
-}{
-
-    env e;
-
-    bytes32 blsPubKey;
-
-    require isKnotRegistered(blsPubKey);
-
-    calldataarg args;
-    f(e, args);
-
-    assert isKnotRegistered(blsPubKey), "Knot should never be marked back as not registered";
-
 }
 
 
