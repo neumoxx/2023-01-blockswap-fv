@@ -1,4 +1,6 @@
 using MocksETH as sETHToken
+using MockSlotSettlementRegistry as slotSettlementRegistry
+using MockStakeHouseUniverse as stakeHouseUniverse
 
 methods {
     //// Regular methods
@@ -13,8 +15,9 @@ methods {
     getMemberInfo(bytes32) returns (address,uint256,uint16,bool) => DISPATCHER(true) // not used directly by Syndicate
     // slotSettlementRegistry
 	stakeHouseShareTokens(address) returns (address)  => DISPATCHER(true)
+	slotSettlementRegistry.numberOfCollateralisedSlotOwnersForKnot(bytes32) returns (uint256) envfree
 	currentSlashedAmountOfSLOTForKnot(bytes32) returns (uint256)  => DISPATCHER(true)
-	numberOfCollateralisedSlotOwnersForKnot(bytes32) returns (uint256)  => ALWAYS(0)
+	numberOfCollateralisedSlotOwnersForKnot(bytes32) returns (uint256)  => DISPATCHER(true)
 	getCollateralisedOwnerAtIndex(bytes32, uint256) returns (address) => DISPATCHER(true)
 	totalUserCollateralisedSLOTBalanceForKnot(address, address, bytes32) returns (uint256) => DISPATCHER(true)
     // sETH
@@ -148,6 +151,10 @@ function sETHSolvencyCorrollary(address user1, address user2, bytes32 knot) retu
  *  the last accumulatedETHPerFreeFloatingShare
  *
  *  Summary: When a knot is deregistered the value snaphotted in lastAccumulatedETHPerFreeFloatingShare must be the updated value of accumulatedETHPerFreeFloatingShare.
+ *      The prover fails in calls to updateCollateralizedSlotOwnersAccruedETH and batchUpdateCollateralizedSlotOwnersAccruedETH
+ *          - lastAccumulatedETHPerFreeFloatingShare before calling the function is 0
+ *          - lastAccumulatedETHPerFreeFloatingShare after call to the function is 1
+ *          - which is different that accumulatedETHPerFreeFloatingShare (it's 22) after calling updateAccruedETHPerShares
  *  Expected behaviour: If lastAccumulatedETHPerFreeFloatingShare is populated, meaning the knot has been deregistered, it has to be with the updated value of accumulatedETHPerFreeFloatingShare, so any call to updateAccruedETHPerShares() after that should not change the value of accumulatedETHPerFreeFloatingShare.
  *  References: https://github.com/Certora/2023-01-blockswap-fv/blob/certora/contracts/syndicate/Syndicate.sol#L345-L357
  */
@@ -177,14 +184,19 @@ rule lastAccumulatedETHPerFreeFloatingShareMustAccountForAccruedETH(method f) fi
 /**
  * Check that if totalETHProcessedPerCollateralizedKnot was bigger than accruedEarningPerCollateralizedSlotOwnerOfKnot 
  * it still is after any call to functions that call _updateCollateralizedSlotOwnersLiabilitySnapshot.
- * WARNING: I filter by callsToLiabilitySnapshot but force to call only function updateCollateralizedSlotOwnersAccruedETH to avoid timeouts
- *
+ *      The prover fails in calls to claimAsCollateralizedSLOTOwner, batchUpdateCollateralizedSlotOwnersAccruedETH, updateCollateralizedSlotOwnersAccruedETH and deRegisterKnots
+ *          - totalETHProcessedPerCollateralizedKnot before calling the function is 1
+ *          - accruedEarningPerCollateralizedSlotOwnerOfKnot before calling the function is 1
+ *          - so totalETHProcessedPerCollateralizedKnot >= accruedEarningPerCollateralizedSlotOwnerOfKnot
+ *          - totalETHProcessedPerCollateralizedKnot after call to the function is 2
+ *          - accruedEarningPerCollateralizedSlotOwnerOfKnot after call to the function is 0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab
+ *          - totalETHProcessedPerCollateralizedKnot should be greater than or equal to accruedEarningPerCollateralizedSlotOwnerOfKnot but it's not
  *  Summary: The value of accruedEarningPerCollateralizedSlotOwnerOfKnot cannot increase more than the value of the rewards being distributed
  *  Expected behaviour: the value of increase of totalETHProcessedPerCollateralizedKnot after a call that calls _updateCollateralizedSlotOwnersLiabilitySnapshot must be greater or equal than the amount of increase of accrued rewards for a single user 
  *  References: https://github.com/Certora/2023-01-blockswap-fv/blob/certora/contracts/syndicate/Syndicate.sol#L545-L564
  */
 rule checkChangeInTotalETHProcessedPerCollateralized(method f) filtered {
-    f -> callsToLiabilitySnapshot(f) && f.selector == updateCollateralizedSlotOwnersAccruedETH(bytes32).selector
+    f -> callsToLiabilitySnapshot(f)
 }{
 
     env e;
@@ -192,7 +204,7 @@ rule checkChangeInTotalETHProcessedPerCollateralized(method f) filtered {
     bytes32 blsPubKey;
     address account;
 
-    require isKnotRegistered(blsPubKey);
+
     require totalETHProcessedPerCollateralizedKnot(blsPubKey) >= accruedEarningPerCollateralizedSlotOwnerOfKnot(blsPubKey, account);
 
     uint256 totalETHProcessedPerCollateralizedBefore = totalETHProcessedPerCollateralizedKnot(blsPubKey);
@@ -208,8 +220,10 @@ rule checkChangeInTotalETHProcessedPerCollateralized(method f) filtered {
 
 /**
  * Check that if numberOfCollateralisedSlotOwnersForKnot is zero, totalETHProcessedPerCollateralizedKnot. should not change
- * WARNING: I used here the summarization ALWAYS(0) to force the return value of numberOfCollateralisedSlotOwnersForKnot. I could not manage to use the implementation (did'nt work) and run out of time.
- *
+ *      The prover fails in calls to updateCollateralizedSlotOwnersAccruedETH, batchUpdateCollateralizedSlotOwnersAccruedETH, claimAsCollateralizedSLOTOwner and deRegisterKnots
+ *          - totalETHProcessedPerCollateralizedKnot before calling the function is 3
+ *          - totalETHProcessedPerCollateralizedKnot after call to the function is 22
+ *          - The value before and after shoul be equal but it's not
  *  Summary: If numberOfCollateralisedSlotOwnersForKnot is equal to zero, the value of totalETHProcessedPerCollateralizedKnot should not change after any call.
  *  Expected behaviour: If no slot owners exist for a given knot, the value of ETH processed of a knot shouldn't change after any call of the contract. But in _updateCollateralizedSlotOwnersLiabilitySnapshot the value is updated accounting for all accrued rewards of the knot regarding of the number of owners.
  *  References: https://github.com/Certora/2023-01-blockswap-fv/blob/certora/contracts/syndicate/Syndicate.sol#L563-L564
@@ -222,6 +236,7 @@ rule checkNumberOfCollateralisedSlotOwnersForKnotIsZeroNoChangeInTotal(method f)
 
     bytes32 blsPubKey;
 
+    require slotSettlementRegistry.numberOfCollateralisedSlotOwnersForKnot(blsPubKey) == 0;
     uint256 totalETHProcessedPerCollateralizedBefore = totalETHProcessedPerCollateralizedKnot(blsPubKey);
 
     calldataarg args;
