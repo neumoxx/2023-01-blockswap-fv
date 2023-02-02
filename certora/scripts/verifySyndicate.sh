@@ -13,7 +13,7 @@ for spec in certora/specs/*.spec;
 do      
     specFile=$(basename $spec)
 
-    if [[ "${specFile%.*}" != "Syndicate" && "${specFile%.*}" != "SyndicateIssues" ]];
+    if [[ "${specFile%.*}" != "SyndicateInjectedBug1" && "${specFile%.*}" != "SyndicateIssues" ]];
     then
         certoraRun  certora/harnesses/SyndicateHarness.sol \
             certora/harnesses/MockStakeHouseUniverse.sol \
@@ -25,7 +25,6 @@ do
             --optimistic_loop \
             --optimize 1 \
             --loop_iter 3 \
-            --send_only \
             $RULE \
             --rule_sanity \
             --settings -optimisticFallback=true \

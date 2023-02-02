@@ -14,14 +14,13 @@ certoraRun  certora/harnesses/SyndicateHarness.sol \
     certora/harnesses/MockStakeHouseRegistry.sol \
     certora/harnesses/MockSlotSettlementRegistry.sol \
     certora/harnesses/MocksETH2.sol:MocksETH \
-    --verify SyndicateHarness:certora/specs/Syndicate.spec \
+    --verify SyndicateHarness:certora/specs/SyndicateInjectedBug1.spec \
     --cloud master \
     --optimistic_loop \
     --optimize 1 \
     --loop_iter 3 \
-    --send_only \
     $RULE \
     --rule_sanity \
     --settings -optimisticFallback=true \
     --packages @blockswaplab=node_modules/@blockswaplab @openzeppelin=node_modules/@openzeppelin \
-    --msg "Syndicate $1 $2"
+    --msg "Syndicate Injected Bug 1 $1 $2"
