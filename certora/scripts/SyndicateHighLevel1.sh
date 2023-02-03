@@ -8,8 +8,7 @@
         --optimistic_loop \
         --optimize 1 \
         --loop_iter 3 \
-        $RULE \
         --rule_sanity \
         --settings -optimisticFallback=true \
         --packages @blockswaplab=node_modules/@blockswaplab @openzeppelin=node_modules/@openzeppelin \
-        --msg "Syndicate $specFile $1 $2"
+        --msg "Syndicate SyndicateHighLevel1"
