@@ -1,0 +1,13 @@
+diff --git a/certora/munged/syndicate/Syndicate.sol b/certora/munged/syndicate/Syndicate.sol
+index 07f69c8..80ab5c7 100644
+--- a/certora/munged/syndicate/Syndicate.sol
++++ b/certora/munged/syndicate/Syndicate.sol
+@@ -221,7 +221,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+             uint256 totalStaked = sETHTotalStakeForKnot[_blsPubKey];
+             if (totalStaked == 12 ether) revert KnotIsFullyStakedWithFreeFloatingSlotTokens();
+ 
+-            if (_sETHAmount + totalStaked > 12 ether) revert InvalidStakeAmount();
++            //if (_sETHAmount + totalStaked > 12 ether) revert InvalidStakeAmount();
+ 
+             totalFreeFloatingShares += _sETHAmount;
+             sETHTotalStakeForKnot[_blsPubKey] += _sETHAmount;

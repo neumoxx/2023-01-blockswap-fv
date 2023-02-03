@@ -1,0 +1,13 @@
+diff --git a/certora/munged/syndicate/Syndicate.sol b/certora/munged/syndicate/Syndicate.sol
+index 07f69c8..030c6af 100644
+--- a/certora/munged/syndicate/Syndicate.sol
++++ b/certora/munged/syndicate/Syndicate.sol
+@@ -647,7 +647,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+ 
+     /// @dev Business logic for de-registering a specific knots assuming all accrued ETH has been processed
+     function _deRegisterKnot(blsKey _blsPublicKey) internal {
+-        if (isKnotRegistered[_blsPublicKey] == false) revert KnotIsNotRegisteredWithSyndicate();
++        //if (isKnotRegistered[_blsPublicKey] == false) revert KnotIsNotRegisteredWithSyndicate();
+         if (isNoLongerPartOfSyndicate[_blsPublicKey] == true) revert KnotHasAlreadyBeenDeRegistered();
+ 
+         // We flag that the knot is no longer part of the syndicate

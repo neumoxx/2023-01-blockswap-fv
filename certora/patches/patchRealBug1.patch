@@ -1,0 +1,20 @@
+diff --git a/certora/munged/syndicate/Syndicate.sol b/certora/munged/syndicate/Syndicate.sol
+index 07f69c8..e2710a8 100644
+--- a/certora/munged/syndicate/Syndicate.sol
++++ b/certora/munged/syndicate/Syndicate.sol
+@@ -344,6 +344,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+     /// @notice For any new ETH received by the syndicate, at the knot level allocate ETH owed to each collateralized owner
+     /// @param _blsPubKey BLS public key relating to the collateralized owners that need updating
+     function updateCollateralizedSlotOwnersAccruedETH(blsKey _blsPubKey) public { // MUNGED internal => public
++        updateAccruedETHPerShares();
+         _updateCollateralizedSlotOwnersLiabilitySnapshot(_blsPubKey);
+     }
+ 
+@@ -352,6 +353,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+     function batchUpdateCollateralizedSlotOwnersAccruedETH(blsKey[] memory _blsPubKeys) public { // MUNGED internal => public
+         uint256 numOfKeys = _blsPubKeys.length;
+         if (numOfKeys == 0) revert EmptyArray();
++        updateAccruedETHPerShares();
+         for (uint256 i; i < numOfKeys; ++i) {
+             _updateCollateralizedSlotOwnersLiabilitySnapshot(_blsPubKeys[i]);
+         }

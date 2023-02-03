@@ -22,7 +22,7 @@ methods {
     // ERC20
     name()                                returns (string)  => DISPATCHER(true)
     symbol()                              returns (string)  => DISPATCHER(true)
-    decimals()                            returns (string)  => DISPATCHER(true)
+    decimals()                            returns (string) envfree => DISPATCHER(true)
     totalSupply()                         returns (uint256) => DISPATCHER(true)
     balanceOf(address)                    returns (uint256) => DISPATCHER(true)
     allowance(address,address)            returns (uint)    => DISPATCHER(true)
@@ -53,6 +53,41 @@ methods {
     addPriorityStakers(address,address)
     batchUpdateCollateralizedSlotOwnersAccruedETH(bytes32)
     batchUpdateCollateralizedSlotOwnersAccruedETH(bytes32,bytes32)
+
+    // added by neumo
+    getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKey(bytes32) returns(uint256) envfree
+    sETHUserClaimForKnot(bytes32, address) returns(uint256) envfree
+    PRECISION() returns(uint256) envfree
+    lastAccumulatedETHPerFreeFloatingShare(bytes32) returns(uint256) envfree
+    owner() returns (address) envfree
+    updatePriorityStakingBlock(uint256)
+    accumulatedETHPerFreeFloatingShare() returns(uint256) envfree
+    accumulatedETHPerCollateralizedSlotPerKnot() returns(uint256) envfree
+    isNoLongerPartOfSyndicate(bytes32) returns (bool) envfree
+    priorityStakingEndBlock() returns (uint256) envfree
+    isPriorityStaker(address) returns (bool) envfree
+    lastSeenETHPerCollateralizedSlotPerKnot() returns(uint256) envfree
+    lastSeenETHPerFreeFloating() returns(uint256) envfree
+    calculateETHForFreeFloatingOrCollateralizedHolders() returns(uint256) envfree
+    calculateUnclaimedFreeFloatingETHShare(bytes32, address) returns(uint256) envfree
+    previewUnclaimedETHAsFreeFloatingStaker(address, bytes32) returns(uint256) envfree
+    getETHBalance(address) returns(uint256) envfree
+    batchPreviewUnclaimedETHAsFreeFloatingStaker(address, bytes32) returns(uint256) envfree
+    calculateNewAccumulatedETHPerFreeFloatingShare() returns (uint256) envfree
+    batchPreviewUnclaimedETHAsCollateralizedSlotOwner(address, bytes32) returns(uint256) envfree
+    previewUnclaimedETHAsCollateralizedSlotOwner(address, bytes32) returns(uint256) envfree
+    getUnprocessedETHForAllFreeFloatingSlot() returns (uint256) envfree
+    getUnprocessedETHForAllCollateralizedSlot() returns (uint256) envfree
+    numberOfRegisteredKnots() returns (uint256) envfree
+    totalFreeFloatingShares() returns (uint256) envfree
+    calculateNewAccumulatedETHPerCollateralizedSharePerKnot() returns (uint256) envfree
+    totalClaimed() returns (uint256) envfree
+    calculateCollateralizedETHOwedPerKnot() returns (uint256) envfree
+    calculateNewAccumulatedETHPerCollateralizedShare(uint256) returns (uint256) envfree
+    updateAccruedETHPerShares()
+    updateCollateralizedSlotOwnersAccruedETH(bytes32)
+    initialize(address, uint256, address, bytes32)
+    isInitialized() returns(bool) envfree
 }
 
 /// We defined additional functions to get around the complexity of defining dynamic arrays in cvl. We filter them in 
@@ -73,7 +108,23 @@ definition notHarnessCall(method f) returns bool =
     && f.selector != registerKnotsToSyndicate(bytes32).selector
     && f.selector != registerKnotsToSyndicate(bytes32,bytes32).selector
     && f.selector != addPriorityStakers(address).selector
-    && f.selector != addPriorityStakers(address,address).selector;
+    && f.selector != addPriorityStakers(address,address).selector
+    && f.selector != batchPreviewUnclaimedETHAsFreeFloatingStaker(address,bytes32).selector
+    && f.selector != getETHBalance(address).selector
+    && f.selector != calculateCollateralizedETHOwedPerKnot().selector
+    && f.selector != calculateNewAccumulatedETHPerCollateralizedShare(uint256).selector
+    && f.selector != getCorrectAccumulatedETHPerFreeFloatingShareForBLSPublicKey(bytes32).selector
+    && f.selector != isInitialized().selector
+    && f.selector != initialize(address,uint256,address,bytes32).selector
+    && f.selector != getETHBalance(address).selector;
+
+
+/// Functions with onlyOwner modifier.
+definition onlyOwnerFunctions(method f) returns bool = 
+    f.selector == deRegisterKnots(bytes32[]).selector
+    || f.selector == registerKnotsToSyndicate(bytes32[]).selector
+    || f.selector == addPriorityStakers(address[]).selector
+    || f.selector == updatePriorityStakingBlock(uint256).selector;
 
 
 /// Corrollary that can be used as requirement after sETH solvency is proven.
@@ -81,51 +132,47 @@ function sETHSolvencyCorrollary(address user1, address user2, bytes32 knot) retu
     return sETHStakedBalanceForKnot(knot,user1) + sETHStakedBalanceForKnot(knot,user2) <= sETHTotalStakeForKnot(knot);
 }
 
-rule getGet() {
-    bytes32 in1; address in2;
-    uint256 out1 = accruedEarningPerCollateralizedSlotOwnerOfKnot(in1,in2);
-    bytes32 in3;
-    uint256 out2 = totalETHProcessedPerCollateralizedKnot(in3);
-    bytes32 in4; address in5;
-    uint256 out3 = sETHStakedBalanceForKnot(in4,in5);
-    bytes32 in6;
-    uint256 out4 = sETHTotalStakeForKnot(in6);
-    assert out1 + out2 + out3 + out4 < 100;
-}
+/*-------------------------------------------------
+|       Unstake with non reverting token           |
+--------------------------------------------------*/
 
 /**
- * An unregistered knot can not be deregistered.
+ * unstake: after execution, ETH balance of recipient varies by the same amount as totalClaimed.
  */
-rule canNotDegisterUnregisteredKnot(method f) filtered {
-    f -> notHarnessCall(f)
-} {
-    bytes32 knot; env e;
-    require !isKnotRegistered(knot);
+rule unstakePostBalances() {
 
-    deRegisterKnots@withrevert(e, knot);
+    env e;
 
-    assert lastReverted, "deRegisterKnots must revert if knot is not registered";
-}
+    address recipient;
+    address sETHRecipient;
+    bytes32 blsPubKey;
+    uint256 sETHAmount;
 
-/**
- * Total ETH received must not decrease.
- */
-rule totalEthReceivedMonotonicallyIncreases(method f) filtered {
-    f -> notHarnessCall(f)
-}{
+    uint256 recipientBalanceBefore = getETHBalance(recipient);
+    uint256 totalClaimedBefore = totalClaimed();
+
+    require numberOfRegisteredKnots() > 0;
+
+    unstake(e, recipient, sETHRecipient, blsPubKey, sETHAmount);
+
+    assert totalClaimed() - totalClaimedBefore == getETHBalance(recipient) - recipientBalanceBefore, "ETH balance of recipient after unstake is wrong";
     
-    uint256 totalEthReceivedBefore = totalETHReceived();
-
-    env e; calldataarg args;
-    f(e, args);
-
-    uint256 totalEthReceivedAfter = totalETHReceived();
-
-    assert totalEthReceivedAfter >= totalEthReceivedBefore, "total ether received must not decrease";
 }
+
+
+
+/*-------------------------------------------------
+|         Invariants, ghosts and hooks             |
+--------------------------------------------------*/
 
 /**
  * Address 0 must have zero sETH balance.
  */
 invariant addressZeroHasNoBalance()
     sETHToken.balanceOf(0) == 0
+
+/**
+ * If knot is no longer part of syndicate, it must be registered
+ */
+invariant noLongerPartOfSyndicateImpliesRegistered(bytes32 blsPubKey)
+    isNoLongerPartOfSyndicate(blsPubKey) => isKnotRegistered(blsPubKey)

@@ -111,6 +111,7 @@ look at the following documentation:
 ---
 # Formal Verification Contest Incentive Model
 ## Key Takeaways
+* The objective is to prove strong properties and strength will be checked by testing the proven properties against 10 bugs, 3 of which are public from the start. Properties that catch real bugs are considered strong already.
 * The total reward is split into three categories: participation, real bugs, and injected bugs
 * Participation rewards are given to all security contributors that have a spec which catches publicly available injected bugs.
 * Discrete injected bugs’ and real bugs’ awards are calculated similarly, using the [same equations as in normal Code4rena contests](https://docs.code4rena.com/awarding/incentive-model-and-awards). 
@@ -125,7 +126,7 @@ The rewards for real bugs and injected bugs will be distributed very similarly, 
 
 For real bugs, high and medium severity bugs will have a total value of 4 and 1 points respectively. Low severity bugs will not be accepted. Severity will be determined in the same way as [normal Code4rena contests](https://code4rena.com/judging-criteria/) with the contest being judged by Certora. To receive rewards for real bugs, submissions must describe the bug and include a rule that detects the bug. 
 
-<font size=1>** For discrete injected bugs and real bugs the  total number of points a bug is worth decreases as the number of discoverers increases. The value deteriorates based on the equation X * 0.9 ^ (n-1) where X is the initial value of the bug and n is the number of discoverers. This is put in place to prevent sybil attacks. </font>
+For discrete injected bugs and real bugs the  total number of points a bug is worth decreases as the number of discoverers increases. The value deteriorates based on the equation X * 0.9 ^ (n-1) where X is the initial value of the bug and n is the number of discoverers. This is put in place to prevent sybil attacks.
 
 ---
 # Working Instructions for Formal Verification Contests

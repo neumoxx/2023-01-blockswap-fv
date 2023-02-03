@@ -1,0 +1,13 @@
+diff --git a/certora/munged/syndicate/Syndicate.sol b/certora/munged/syndicate/Syndicate.sol
+index 07f69c8..cc117fb 100644
+--- a/certora/munged/syndicate/Syndicate.sol
++++ b/certora/munged/syndicate/Syndicate.sol
+@@ -688,7 +688,7 @@ contract Syndicate is ISyndicateInit, Initializable, Ownable, ReentrancyGuard, S
+         uint256 totalToTransfer;
+         for (uint256 i; i < numOfKeys; ++i) {
+             blsKey _blsPubKey = _blsPubKeys[i];
+-            if (!isKnotRegistered[_blsPubKey]) revert KnotIsNotRegisteredWithSyndicate();
++            //if (!isKnotRegistered[_blsPubKey]) revert KnotIsNotRegisteredWithSyndicate();
+ 
+             uint256 unclaimedUserShare = calculateUnclaimedFreeFloatingETHShare(_blsPubKey, msg.sender);
+ 
